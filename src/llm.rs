@@ -28,59 +28,14 @@ pub struct LLM {
     pub tokenizer: tokenizers::Tokenizer,
 }
 
+#[derive(Default)]
 pub struct LLMBuilder {
-    hf_hub_api: Option<hf_hub::api::tokio::Api>,
     tokenizer_repo_id: Option<String>,
-    tokenizer_repo_revision: String,
-    tokenizer_file_name: String,
+    tokenizer_repo_revision: Option<String>,
+    tokenizer_file_name: Option<String>,
     model_repo_id: Option<String>,
-    model_repo_revision: String,
+    model_repo_revision: Option<String>,
     model_file_name: Option<String>,
-}
-
-/// `Default` is a trait for giving a type a useful default value.
-/// https://doc.rust-lang.org/std/default/trait.Default.html
-impl Default for LLMBuilder {
-    /// Rust doesn't have built-in support for static constructors, but you can implement the Default trait for
-    /// a type and use the default function to create a new instance. See <https://doc.rust-lang.org/nomicon/constructors.html>
-    ///
-    /// If the struct needs to be initialized with some parameters, the convention is to use an `new` to create an object
-    /// <https://rust-unofficial.github.io/patterns/idioms/ctor.html>
-    ///
-    /// Example:
-    /// ```
-    /// struct LLMBuilder { hf_hub_api: Option<hf_hub::api::tokio::Api> }
-    /// impl LLMBuilder {
-    ///    pub fn new(hf_hub_api: hf_hub::api::tokio::Api) -> Self {
-    ///       Self { hf_hub_api: Some(hf_hub_api) }
-    ///   }
-    /// }
-    /// ```
-    /// In our case, we don't need to initialize the LLMBuilder struct with any parameters, so we can use the Default trait.
-    ///
-    /// Example:
-    /// ```
-    /// struct LLMBuilder {}
-    /// impl Default for LLMBuilder {
-    ///   fn default() -> Self { Self {} }
-    /// }
-    /// let llm = LLMBuilder::default();
-    /// ````
-    fn default() -> Self {
-        let hf_hub_api = match hf_hub::api::tokio::Api::new() {
-            Ok(hf_hub) => Some(hf_hub),
-            Err(_error) => None,
-        };
-        Self {
-            hf_hub_api,
-            tokenizer_repo_id: None,
-            tokenizer_repo_revision: "main".to_string(),
-            tokenizer_file_name: "tokenizer.json".to_string(),
-            model_repo_id: None,
-            model_repo_revision: "main".to_string(),
-            model_file_name: None,
-        }
-    }
 }
 
 impl LLMBuilder {
@@ -134,11 +89,11 @@ impl LLMBuilder {
         // `into()` is a trait that converts the value of one type into the value of another type.
         // Since `tokenizer_repo_revision: impl Into<String>` we will convert a string slice into a String.
         // and if we pass a String, no allocation will happenend.
-        self.tokenizer_repo_revision = tokenizer_repo_revision.into();
+        self.tokenizer_repo_revision = Some(tokenizer_repo_revision.into());
         self
     }
     pub fn tokenizer_file_name(mut self, tokenizer_file_name: impl Into<String>) -> Self {
-        self.tokenizer_file_name = tokenizer_file_name.into();
+        self.tokenizer_file_name = Some(tokenizer_file_name.into());
         self
     }
 
@@ -148,7 +103,7 @@ impl LLMBuilder {
     }
 
     pub fn model_repo_revision(mut self, model_repo_revision: impl Into<String>) -> Self {
-        self.model_repo_revision = model_repo_revision.into();
+        self.model_repo_revision = Some(model_repo_revision.into());
         self
     }
 
@@ -161,34 +116,23 @@ impl LLMBuilder {
         let tokenizer_repo_id = self
             .tokenizer_repo_id
             .context("tokenizer_repo_id is None, forgot to .tokenizer_repo_id()?")?;
-        let tokenizer_repo_revision = self.tokenizer_repo_revision;
-        let tokenizer_file_name = self.tokenizer_file_name;
+        let tokenizer_repo_revision = self.tokenizer_repo_revision.unwrap_or("main".to_string());
+        let tokenizer_file_name = self.tokenizer_file_name.unwrap_or("tokenizer.json".to_string());
         let model_repo_id = self
             .model_repo_id
             .context("model_repo_id is None, forgot to .model_repo_id()?")?;
-        let model_repo_revision = self.model_repo_revision;
+        let model_repo_revision = self.model_repo_revision.unwrap_or("main".to_string());
         let model_file_name = self
             .model_file_name
             .context("model_file_name is None, forgot to .model_file_name()?")?;
 
-        // The `hf_hub_api` is created in the `default()` is unlikely to fail, but if it does,
-        // we will retry and return an error this time.
-        let hf_hub_api = match self.hf_hub_api {
-            Some(hf_hub_api) => hf_hub_api,
-            None => {
-                // Let's try again ton `new()` the hf_hub_api
-                match hf_hub::api::tokio::Api::new() {
-                    Ok(hf_hub) => hf_hub,
-                    Err(error) => {
-                        // Let's return an error this time.
-                        // `anyhow!` is a macro that creates an error type that implements the Error trait.
-                        // see https://github.com/dtolnay/anyhow/blob/master/src/macros.rs
-                        return Result::Err(anyhow!(
-                            "hf_hub_api initialization failed because of {:?}",
-                            error
-                        ));
-                    }
-                }
+        let hf_hub_api = match hf_hub::api::tokio::Api::new() {
+            Ok(hf_hub) => hf_hub,
+            Err(error) => {
+                return Result::Err(anyhow!(
+                    "hf_hub_api initialization failed because of {:?}",
+                    error
+                ));
             }
         };
 
