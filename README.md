@@ -10,4 +10,7 @@
 
 The primary goal of this project is to teach (myself, and everyone else) idiomatic Rust, similar to [mini-redis](https://github.com/tokio-rs/mini-redis), thefore the code is overly heavily documented, there is an article introducing the core concepts [I made a Copilot in Rust 🦀 , here is what I have learned... ](), I recommand to read first, and [PRs description](https://github.com/chenhunghan/oxpilot/pulls?q=is%3Apr) are heavily documented with design patterns used in the code base.
 
- 
+- Indroduction
+- Design Patterns
+  - [Builder](https://github.com/chenhunghan/oxpilot/pull/1)
+  - [Type State](https://github.com/chenhunghan/oxpilot/pull/4)
