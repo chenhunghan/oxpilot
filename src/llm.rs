@@ -28,10 +28,21 @@ pub struct LLM {
     pub tokenizer: tokenizers::Tokenizer,
 }
 
-#[derive(Default)]
+/// This is a unit struct. A unit struct, e.g. `struct Unit` is a struct that has no fields.
+/// They are most commonly used as marker types.
+/// 
+/// Common struct types in Rust:
+///   - Unit struct: `struct Unit;`
+///   - Classic struct: `struct Classic { a: i32, b: f32 }` Each field in the struct has a name and a data type. 
+///     After a classic struct is defined, the fields in the struct can be accessed by using the syntax <struct>.<field>.
+///   - Tuple struct: `struct Tuple(i32, f32);` are similar to classic structs, but the fields don't have names To access 
+///     the fields in a tuple struct: <tuple>.<index>. The index values in the tuple struct start at zero.
+#[derive(Debug, Default)]
 pub struct NoTokenRepoId;
 
-#[derive(Default)]
+// The #[derive(Debug)] syntax lets us see certain values during the code execution that aren't otherwise viewable in standard output. 
+// To view debug data with the println! macro, we use the syntax {:#?} to format the data in a readable manner.
+#[derive(Debug, Default)]
 pub struct TokenRepoId(String);
 
 #[derive(Default)]
