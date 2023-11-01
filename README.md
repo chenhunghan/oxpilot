@@ -1,6 +1,6 @@
 # `oxpilot` - AI copilot, in Rust
 
-`oxpilot` is a copilot server powered by LLM (large language models) written in Rust. It's built on top of [candle](https://github.com/huggingface/candle), with aims to be minimalist, fast, and accessable (in terms of computing resource) copilot for everyone.
+`oxpilot` is a copilot server powered by LLM (large language models) written in Rust 🦀. It's built on top of [candle](https://github.com/huggingface/candle), with aims to be minimalist, fast, and accessable (in terms of computing resource) copilot for everyone.
 
 <p align="center">
   <img src="./doc/img/rusty-copilot.jpeg" width="320" height="320" alt="A rusty programming copilot" />
