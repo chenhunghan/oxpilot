@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Result};
 /// use oxpilot::llm::LLMBuilder;
 /// #[tokio::main]
 /// async fn main() {
-///    let llm_builder = LLMBuilder::default()
+///    let llm_builder = LLMBuilder::new()
 ///         .tokenizer_repo_id("hf-internal-testing/llama-tokenizer")
 ///         .model_repo_id("TheBloke/CodeLlama-7B-GGU")
 ///         .model_file_name("codellama-7b.Q2_K.gguf");
@@ -28,7 +28,14 @@ pub struct LLM {
     pub tokenizer: tokenizers::Tokenizer,
 }
 
-#[derive(Default)]
+/// `Default` is a trait for giving a type a useful default value.
+/// https://doc.rust-lang.org/std/default/trait.Default.html
+/// `Option<String>` would be `None` by default with `#[derive(Default)]`
+///
+/// `PartialEq` is a trait for equality comparisons that is used in tests.
+/// https://doc.rust-lang.org/std/cmp/trait.PartialEq.html
+/// e.g. `assert!(LLMBuilder::default() == LLMBuilder::new())`
+#[derive(Default, PartialEq)]
 pub struct LLMBuilder {
     tokenizer_repo_id: Option<String>,
     tokenizer_repo_revision: Option<String>,
@@ -45,14 +52,6 @@ impl LLMBuilder {
     }
     /// Should function parameter be `String` or `&str`....or both?
     /// Short answer: `impl Into<String>` is preferred as it allows both `&str` and `String`.
-    ///
-    /// ```
-    /// use oxpilot::llm::LLMBuilder;
-    /// let repo_id_string_slice = "string_slice";
-    /// let _ = LLMBuilder::default().tokenizer_repo_id(repo_id_string_slice);
-    /// let repo_id_string = String::from("String");
-    /// let _ = LLMBuilder::default().tokenizer_repo_id(repo_id_string);
-    /// ```
     ///
     /// <https://rhai.rs/book/rust/strings.html> suggests that The parameter type `String` involves always converting an
     /// `ImmutableString` into a String which mandates cloning it.
@@ -117,7 +116,9 @@ impl LLMBuilder {
             .tokenizer_repo_id
             .context("tokenizer_repo_id is None, forgot to .tokenizer_repo_id()?")?;
         let tokenizer_repo_revision = self.tokenizer_repo_revision.unwrap_or("main".to_string());
-        let tokenizer_file_name = self.tokenizer_file_name.unwrap_or("tokenizer.json".to_string());
+        let tokenizer_file_name = self
+            .tokenizer_file_name
+            .unwrap_or("tokenizer.json".to_string());
         let model_repo_id = self
             .model_repo_id
             .context("model_repo_id is None, forgot to .model_repo_id()?")?;
@@ -183,10 +184,34 @@ impl LLMBuilder {
     }
 }
 
-#[tokio::test]
-async fn builder_test() {
-    let repo_id_string_slice = "string_slice";
-    let _ = LLMBuilder::default().tokenizer_repo_id(repo_id_string_slice);
-    let repo_id_string = String::from("String");
-    let _ = LLMBuilder::default().tokenizer_repo_id(repo_id_string);
+#[cfg(test)]
+mod llm_builder_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn default_is_same_as_new() {
+        assert!(LLMBuilder::default() == LLMBuilder::new());
+    }
+
+    #[tokio::test]
+    async fn can_accept_string() {
+        let _ = LLMBuilder::new()
+            .tokenizer_repo_id(String::from("repo"))
+            .tokenizer_repo_revision(String::from("main"))
+            .tokenizer_file_name(String::from("tokenizer.json"))
+            .model_repo_id(String::from("repo"))
+            .model_repo_revision(String::from("main"))
+            .model_file_name(String::from("model.file"));
+    }
+
+    #[tokio::test]
+    async fn can_accept_string_slice() {
+        let _ = LLMBuilder::new()
+            .tokenizer_repo_id("string_slice")
+            .tokenizer_repo_revision("main")
+            .tokenizer_file_name("tokenizer.json")
+            .model_repo_id("repo")
+            .model_repo_revision("main")
+            .model_file_name("model.file");
+    }
 }
