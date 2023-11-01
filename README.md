@@ -12,5 +12,5 @@ The primary goal of this project is to teach (myself, and everyone else) idiomat
 
 - Indroduction
 - Design Patterns
-  - [Builder](https://github.com/chenhunghan/oxpilot/pull/1)
+  - [Builder and `impl Into<String>`](https://github.com/chenhunghan/oxpilot/pull/1)
   - [Type State](https://github.com/chenhunghan/oxpilot/pull/4)
