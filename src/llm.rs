@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context, Result};
 /// In this file we are using the "Builder" pattern to create `LLM` struc instances. "Builder" pattern is a common design
 /// pattern that used in Rust. It is a creational pattern that lets you construct complex objects step by step.
 /// See https://github.com/chenhunghan/oxpilot/pull/1
-/// 
+///
 /// ```
 /// use oxpilot::llm::LLMBuilder;
 /// #[tokio::main]
@@ -50,15 +50,15 @@ pub struct LLMBuilder<State> {
 /// Type state for LLMBuilder
 /// See https://github.com/chenhunghan/oxpilot/pull/5
 /// Init state when `::new()` is called.
-/// 
+///
 /// `pub struct StrucName` is a unit struct. A unit struct is a struct that has no fields.
 /// They are most commonly used as marker types.
-/// 
+///
 /// Common struct types in Rust:
 ///   - Unit struct: `struct Unit;`
-///   - Classic struct: `struct Classic { a: i32, b: f32 }` Each field in the struct has a name and a data type. 
+///   - Classic struct: `struct Classic { a: i32, b: f32 }` Each field in the struct has a name and a data type.
 ///     After a classic struct is defined, the fields in the struct can be accessed by using the syntax <struct>.<field>.
-///   - Tuple struct: `struct Tuple(i32, f32);` are similar to classic structs, but the fields don't have names To access 
+///   - Tuple struct: `struct Tuple(i32, f32);` are similar to classic structs, but the fields don't have names To access
 ///     the fields in a tuple struct: <tuple>.<index>. The index values in the tuple struct start at zero.
 #[derive(PartialEq)]
 pub struct InitState;
@@ -87,14 +87,6 @@ impl LLMBuilder<InitState> {
             state: InitState,
         }
     }
-}
-
-impl<State> LLMBuilder<State> {
-    // Here we can add methods that are common to all states.
-}
-
-// The initial state
-impl LLMBuilder<InitState> {
     /// Should function parameter be `String` or `&str`....or both?
     /// Short answer: `impl Into<String>` is preferred as it allows both `&str` and `String`.
     ///
@@ -138,6 +130,10 @@ impl LLMBuilder<InitState> {
             state: WithTokenizerRepoId,
         }
     }
+}
+
+impl<State> LLMBuilder<State> {
+    // Here we can add methods that are common to all states.
 }
 
 impl LLMBuilder<WithTokenizerRepoId> {
