@@ -35,7 +35,7 @@ pub struct LLM {
 /// `PartialEq` is a trait for equality comparisons that is used in tests.
 /// https://doc.rust-lang.org/std/cmp/trait.PartialEq.html
 /// e.g. `assert!(LLMBuilder::default() == LLMBuilder::new())`
-#[derive(Default, PartialEq, Clone)]
+#[derive(Default, PartialEq)]
 pub struct LLMBuilder<State> {
     tokenizer_repo_id: Option<String>,
     tokenizer_repo_revision: Option<String>,
