@@ -2,7 +2,8 @@ use anyhow::{anyhow, Context, Result};
 
 /// In this file we are using the "Builder" pattern to create `LLM` struc instances. "Builder" pattern is a common design
 /// pattern that used in Rust. It is a creational pattern that lets you construct complex objects step by step.
-///
+/// See https://github.com/chenhunghan/oxpilot/pull/1
+/// 
 /// ```
 /// use oxpilot::llm::LLMBuilder;
 /// #[tokio::main]
@@ -47,6 +48,7 @@ pub struct LLMBuilder<State> {
 }
 
 /// Type state for LLMBuilder
+/// See https://github.com/chenhunghan/oxpilot/pull/5
 /// Init state when `::new()` is called.
 /// 
 /// `pub struct StrucName` is a unit struct. A unit struct is a struct that has no fields.
