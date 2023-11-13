@@ -202,9 +202,9 @@ impl LLMBuilder<ReadyState> {
         };
 
         let tokenizer_repo = hf_hub_api.repo(hf_hub::Repo::with_revision(
-            tokenizer_repo_id.clone(),
+            tokenizer_repo_id.to_owned(),
             hf_hub::RepoType::Model,
-            tokenizer_repo_revision.clone(),
+            tokenizer_repo_revision.to_owned(),
         ));
         let tokenizer_file_path = tokenizer_repo
             .get(&tokenizer_file_name)
@@ -226,9 +226,9 @@ impl LLMBuilder<ReadyState> {
             .context("model_file_name is None, forgot to .model_file_name()?")?;
 
         let model_repo = hf_hub_api.repo(hf_hub::Repo::with_revision(
-            model_repo_id.clone(),
+            model_repo_id.to_owned(),
             hf_hub::RepoType::Model,
-            model_repo_revision.clone(),
+            model_repo_revision.to_owned(),
         ));
         let model_file_path = model_repo
             .get(&model_file_name)
