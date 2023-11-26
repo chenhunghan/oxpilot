@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::{anyhow, Context, Result};
 
 /// In this file we are using the "Builder" pattern to create `LLM` struc instances. "Builder" pattern is a common design
@@ -44,6 +46,7 @@ pub struct LLMBuilder<State> {
     model_repo_id: Option<String>,
     model_repo_revision: Option<String>,
     model_file_name: Option<String>,
+    cache_dir: Option<PathBuf>,
     state: State,
 }
 
@@ -84,6 +87,7 @@ impl LLMBuilder<InitState> {
             model_repo_id: None,
             model_repo_revision: None,
             model_file_name: None,
+            cache_dir: None,
             state: InitState,
         }
     }
@@ -127,6 +131,7 @@ impl LLMBuilder<InitState> {
             model_repo_id: self.model_repo_id,
             model_repo_revision: self.model_repo_revision,
             model_file_name: self.model_file_name,
+            cache_dir: self.cache_dir,
             state: WithTokenizerRepoId,
         }
     }
@@ -145,6 +150,7 @@ impl LLMBuilder<WithTokenizerRepoId> {
             model_repo_id: Some(model_repo_id.into()),
             model_repo_revision: self.model_repo_revision,
             model_file_name: self.model_file_name,
+            cache_dir: self.cache_dir,
             state: WithModelRepoId,
         }
     }
@@ -159,6 +165,7 @@ impl LLMBuilder<WithModelRepoId> {
             model_repo_id: self.model_repo_id,
             model_repo_revision: self.model_repo_revision,
             model_file_name: Some(model_file_name.into()),
+            cache_dir: self.cache_dir,
             state: ReadyState,
         }
     }
@@ -182,6 +189,12 @@ impl LLMBuilder<ReadyState> {
         self
     }
 
+    pub fn cache_dir(mut self, cache_dir_string: impl Into<String>) -> Self {
+        let path = std::path::PathBuf::from(cache_dir_string.into());
+        self.cache_dir = Some(path);
+        self
+    }
+
     pub async fn build(self) -> Result<LLM> {
         let tokenizer_repo_id = self
             .tokenizer_repo_id
@@ -191,7 +204,19 @@ impl LLMBuilder<ReadyState> {
             .tokenizer_file_name
             .unwrap_or("tokenizer.json".to_string());
 
-        let hf_hub_api = match hf_hub::api::tokio::Api::new() {
+        let cache_dir = self.cache_dir.unwrap_or({
+            let mut home = dirs::home_dir().context("Failed to get user home dir")?;
+            home.push(".oxpilot");
+            home
+        });
+        tokio::fs::create_dir_all(&cache_dir)
+            .await
+            .context("Failed to crate cache dir for hf_hub_api")?;
+        let hf_hub_api = match hf_hub::api::tokio::ApiBuilder::new()
+            .with_progress(true)
+            .with_cache_dir(cache_dir)
+            .build()
+        {
             Ok(hf_hub) => hf_hub,
             Err(error) => {
                 return Result::Err(anyhow!(

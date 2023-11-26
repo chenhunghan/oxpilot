@@ -9,7 +9,8 @@ edition = "2021"
 tokio = { version = "1.32.0", features = ["full"] }
 hf-hub = { version = "0.3.1", features = ["tokio"] }
 tokenizers = "0.14.0"
-candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.3.0" }
-candle-nn = { git = "https://github.com/huggingface/candle.git", version = "0.3.0" }
-candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.3.0" }
+candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.3.1" }
+candle-nn = { git = "https://github.com/huggingface/candle.git", version = "0.3.1" }
+candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.3.1" }
 anyhow = "1.0"
+dirs = "5.0.1"
