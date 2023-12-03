@@ -14,3 +14,4 @@ The primary goal of this project is to teach (myself, and everyone else) idiomat
 - Design Patterns
   - [Builder and `impl Into<String>`](https://github.com/chenhunghan/oxpilot/pull/1)
   - [Type State: Friendly API for Better DX](https://github.com/chenhunghan/oxpilot/pull/5)
+  - [BDD `POST /v1/engines/:engine/completions`](https://github.com/chenhunghan/oxpilot/pull/6)
