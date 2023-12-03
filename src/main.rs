@@ -22,8 +22,12 @@ fn app() -> Router {
         .route("/v1/completions", post(completion))
 }
 
+/// The #[cfg(test)] annotation on the tests module tells Rust to compile and run the test
+/// code only when you run cargo test, not when you run cargo build. This saves compile time when you only
+/// want to build the library and saves space in the resulting compiled artifact because the tests are not included.
 #[cfg(test)]
 mod tests {
+    // imports are only for the tests
     use eventsource_stream::Eventsource; // needed for `.eventsource()`
     use futures::prelude::*; // needed for `.next().await`
     use oxpilot::types::Completion;
@@ -31,6 +35,8 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
     use tokio::net::TcpListener;
 
+    /// `super::*` means "everything in the parent module"
+    /// It will bring all of the test module’s parent’s items into scope.
     use super::*;
     /// A helper function that spawns our application in the background
     /// and returns its address (e.g. http://127.0.0.1:[random_port])
@@ -46,15 +52,18 @@ mod tests {
             axum::serve(listener, app).await.unwrap();
         });
 
+        // We return the application address to the caller!
         format!("http://{}:{}", _host, port)
     }
 
+    /// The #[tokio::test] annotation on the test_sse_engine_completion function is a macro.
+    /// Similar to #[tokio::main] It transforms the async fn test_sse_engine_completion()
+    /// into a synchronous fn test_sse_engine_completion() that initializes a runtime instance
+    /// and executes the async main function.
     #[tokio::test]
     async fn test_sse_engine_completion() {
         let listening_url = spawn_app("127.0.0.1").await;
-
         let mut completions: Vec<Completion> = vec![];
-
         let model_name = "code-llama-7b";
         let body = serde_json::json!({
             "model": model_name,
@@ -94,6 +103,8 @@ mod tests {
             .bytes_stream()
             .eventsource();
 
+        // iterate over the stream of events
+        // and collect them into a vector of Completion objects
         while let Some(event) = stream.next().await {
             match event {
                 Ok(event) => {
