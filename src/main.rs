@@ -3,6 +3,23 @@ use oxpilot::llm::LLMBuilder;
 use routes::completion::completion;
 pub mod routes;
 
+// The `#[tokio::main]` function is a macro. It transforms the async fn main()
+// into a synchronous fn main() that initializes a runtime instance and executes the async main function.
+// ```no_run
+// #[tokio::main]
+// async fn main() {
+//     println!("hello");
+// }
+// ```
+// is transformed to:
+// ```no_run
+// fn main() {
+//     let mut rt = tokio::runtime::Runtime::new().unwrap();
+//     rt.block_on(async {
+//         println!("hello");
+//     })
+// }
+// ```
 #[tokio::main]
 async fn main() {
     let llm_builder = LLMBuilder::new()
@@ -47,6 +64,7 @@ mod tests {
         // We retrieve the port assigned to us by the OS
         let port = listener.local_addr().unwrap().port();
 
+        // The `move` keyword is used to **move** the ownership of `listener` into the task.
         let _ = tokio::spawn(async move {
             let app = app();
             axum::serve(listener, app).await.unwrap();
