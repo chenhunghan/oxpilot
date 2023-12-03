@@ -108,10 +108,12 @@ mod tests {
         while let Some(event) = stream.next().await {
             match event {
                 Ok(event) => {
+                    // break the loop at the end of SSE stream
                     if event.data == "[DONE]" {
                         break;
                     }
 
+                    // parse the event data into a Completion object
                     let completion = serde_json::from_str::<Completion>(&event.data).unwrap();
                     completions.push(completion);
                 }
@@ -120,7 +122,7 @@ mod tests {
                 }
             }
         }
-        // return at least one completion object
+        // The endpoint should return at least one completion object
         assert!(completions.len() > 0);
 
         // Check that each completion object has the correct fields
