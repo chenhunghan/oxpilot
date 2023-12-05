@@ -1,9 +1,8 @@
+use crate::llm::LLM;
+use crate::token::token_to_text;
 use candle_core::{Device, Tensor};
 use candle_transformers::generation::LogitsProcessor;
 use candle_transformers::models::quantized_llama::MAX_SEQ_LEN;
-
-use crate::llm::LLM;
-use crate::token::token_to_text;
 
 /// A function that takes a prompt and returns the generated text to a responder.
 /// ```no_run

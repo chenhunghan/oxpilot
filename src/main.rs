@@ -1,7 +1,17 @@
 use axum::{routing::post, Router};
+use candle_core::utils::{get_num_threads, has_accelerate, has_mkl};
+use oxpilot::cmd::Command::Prompt;
 use oxpilot::llm::LLMBuilder;
+use oxpilot::process::process;
 use routes::completion::completion;
+use tokio::sync::mpsc;
+use tracing::info;
+use tracing_subscriber::fmt::format::FmtSpan;
+pub mod llm;
+pub mod process;
 pub mod routes;
+pub mod state;
+pub mod token;
 
 // The `#[tokio::main]` function is a macro. It transforms the async fn main()
 // into a synchronous fn main() that initializes a runtime instance and executes the async main function.
@@ -22,21 +32,102 @@ pub mod routes;
 // ```
 #[tokio::main]
 async fn main() {
-    let llm_builder = LLMBuilder::new()
-        .tokenizer_repo_id("hf-internal-testing/llama-tokenizer")
-        .model_repo_id("TheBloke/CodeLlama-7B-GGUF")
-        .model_file_name("codellama-7b.Q2_K.gguf");
-    let _ = llm_builder.build().await.expect("Failed to build LLM");
+    // The tracing crate is a framework for instrumenting Rust programs to
+    // collect structured, event-based diagnostic information.
+    // https://github.com/tokio-rs/tracing
+    // https://tokio.rs/tokio/topics/tracing
+    // Start configuring a `fmt` subscriber
+    let subscriber = tracing_subscriber::fmt()
+        // Use a more compact, abbreviated log format
+        .compact()
+        // Display source code file paths
+        .with_file(true)
+        // Display source code line numbers
+        .with_line_number(true)
+        // Display the thread ID an event was recorded on
+        .with_thread_ids(true)
+        // Display the event's target (module path)
+        .with_target(true)
+        // Add span events
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
+        // Build the subscriber
+        .finish();
 
+    // Set the subscriber as the default
+    match tracing::subscriber::set_global_default(subscriber) {
+        Ok(_) => (),
+        Err(error) => panic!(
+            "error setting default tracer as `fmt` subscriber {:?}",
+            error
+        ),
+    };
+    if has_accelerate() {
+        info!("candle was compiled with 'accelerate' support")
+    }
+    if has_mkl() {
+        info!("candle was compiled with 'mkl' support")
+    }
+    info!("number of thread: {:?} used by candle", get_num_threads());
+
+    let llm_builder = LLMBuilder::new()
+        .tokenizer_repo_id("01-ai/Yi-6B")
+        .model_repo_id("TheBloke/Yi-6B-GGUF")
+        .model_file_name("yi-6b.Q4_K_M.gguf");
+    // .tokenizer_repo_id("deepseek-ai/deepseek-llm-7b-base")
+    // .model_repo_id("TheBloke/deepseek-llm-7B-base-GGUF")
+    // .model_file_name("deepseek-llm-7b-base.Q4_K_M.gguf");
+    // .tokenizer_repo_id("mistralai/Mistral-7B-v0.1")
+    // .model_repo_id("TheBloke/zephyr-7B-beta-GGUF")
+    // .model_file_name("zephyr-7b-beta.Q4_K_M.gguf");
+    let mut llm = llm_builder.build().await.expect("Failed to build LLM");
+
+    let (tx, mut rx) = mpsc::channel(32);
+    let manager = tokio::spawn(async move {
+        let seed = 299792458;
+        let temperature: f64 = 1.0;
+        let top_p = 1.1;
+        let n = 10;
+        let repeat_last_n = 64;
+        let repeat_penalty = 1.1;
+        while let Some(cmd) = rx.recv().await {
+            match cmd {
+                // handle Command::Prompt from `tx.send().await`;
+                Prompt { prompt, responder } => {
+                    process(
+                        prompt,
+                        &mut llm,
+                        responder,
+                        n,
+                        seed,
+                        temperature,
+                        top_p,
+                        repeat_last_n,
+                        repeat_penalty,
+                    )
+                    .await;
+                }
+            }
+        }
+    });
+
+    let state = state::AppState { tx };
     let listener = tokio::net::TcpListener::bind("0.0.0.0:6666").await.unwrap();
-    let app = app();
-    axum::serve(listener, app).await.unwrap();
+    let app = app(state);
+
+    match axum::serve(listener, app).await {
+        Ok(_) => info!("Server exited."),
+        Err(error) => {
+            info!("Server exited with error: {}", error);
+            manager.abort();
+        }
+    }
 }
 
-fn app() -> Router {
+fn app(state: state::AppState) -> Router {
     Router::new()
         .route("/v1/engines/:engine/completions", post(completion))
         .route("/v1/completions", post(completion))
+        .with_state(state)
 }
 
 /// The #[cfg(test)] annotation on the tests module tells Rust to compile and run the test
@@ -66,7 +157,9 @@ mod tests {
 
         // The `move` keyword is used to **move** the ownership of `listener` into the task.
         let _ = tokio::spawn(async move {
-            let app = app();
+            let (tx, _) = mpsc::channel(32);
+            let state = state::AppState { tx };
+            let app = app(state);
             axum::serve(listener, app).await.unwrap();
         });
 
