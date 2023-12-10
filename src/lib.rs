@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod cmd;
 pub mod llm;
 pub mod process;

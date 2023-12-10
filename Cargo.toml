@@ -3,6 +3,11 @@ name = "oxpilot"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+# https://github.com/rust-lang/cargo/pull/9627/files#diff-e35cef716988e9f7122a9c90479aa9204e61d1f41b094c0d183a44e0ca271eaa
+name = "ox"
+path = "src/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -21,6 +26,7 @@ async-stream = "0.3.5"
 futures = "0.3.29"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
+clap = { version = "4.4.11", features = ["derive", "wrap_help"] }
 
 [dev-dependencies]
 reqwest = { version = "0.11.22", features = ["json", "stream", "multipart"] }

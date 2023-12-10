@@ -1,5 +1,7 @@
 use axum::{routing::post, Router};
 use candle_core::utils::{get_num_threads, has_accelerate, has_mkl};
+use clap::Parser;
+use oxpilot::cli::CLIArgs;
 use oxpilot::cmd::Command::Prompt;
 use oxpilot::llm::LLMBuilder;
 use oxpilot::process::process;
@@ -62,33 +64,29 @@ async fn main() {
         ),
     };
     if has_accelerate() {
-        info!("candle was compiled with 'accelerate' support")
+        info!("oxpilot's candle was compiled with 'accelerate' support")
     }
     if has_mkl() {
-        info!("candle was compiled with 'mkl' support")
+        info!("oxpilot's candle was compiled with 'mkl' support")
     }
     info!("number of thread: {:?} used by candle", get_num_threads());
 
+    let cli_args = CLIArgs::parse();
+
     let llm_builder = LLMBuilder::new()
-        .tokenizer_repo_id("01-ai/Yi-6B")
-        .model_repo_id("TheBloke/Yi-6B-GGUF")
-        .model_file_name("yi-6b.Q4_K_M.gguf");
-    // .tokenizer_repo_id("deepseek-ai/deepseek-llm-7b-base")
-    // .model_repo_id("TheBloke/deepseek-llm-7B-base-GGUF")
-    // .model_file_name("deepseek-llm-7b-base.Q4_K_M.gguf");
-    // .tokenizer_repo_id("mistralai/Mistral-7B-v0.1")
-    // .model_repo_id("TheBloke/zephyr-7B-beta-GGUF")
-    // .model_file_name("zephyr-7b-beta.Q4_K_M.gguf");
+        .tokenizer_repo_id(cli_args.tokenizer_repo_id)
+        .model_repo_id(cli_args.model_repo_id)
+        .model_file_name(cli_args.model_file_name);
     let mut llm = llm_builder.build().await.expect("Failed to build LLM");
 
     let (tx, mut rx) = mpsc::channel(32);
     let manager = tokio::spawn(async move {
-        let seed = 299792458;
-        let temperature: f64 = 1.0;
-        let top_p = 1.1;
-        let n = 10;
-        let repeat_last_n = 64;
-        let repeat_penalty = 1.1;
+        let seed = cli_args.seed;
+        let temperature: f64 = cli_args.temperature;
+        let top_p = cli_args.top_p;
+        let to_sample = cli_args.to_sample;
+        let repeat_last_n = cli_args.repeat_last_n;
+        let repeat_penalty = cli_args.repeat_penalty;
         while let Some(cmd) = rx.recv().await {
             match cmd {
                 // handle Command::Prompt from `tx.send().await`;
@@ -97,7 +95,7 @@ async fn main() {
                         prompt,
                         &mut llm,
                         responder,
-                        n,
+                        to_sample,
                         seed,
                         temperature,
                         top_p,
@@ -110,15 +108,19 @@ async fn main() {
         }
     });
 
-    let state = state::AppState { tx };
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:6666").await.unwrap();
-    let app = app(state);
+    if cli_args.copilot_serve {
+        let state = state::AppState { tx };
+        let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", cli_args.port))
+            .await
+            .unwrap();
+        let app = app(state);
 
-    match axum::serve(listener, app).await {
-        Ok(_) => info!("Server exited."),
-        Err(error) => {
-            info!("Server exited with error: {}", error);
-            manager.abort();
+        match axum::serve(listener, app).await {
+            Ok(_) => info!("Server exited."),
+            Err(error) => {
+                info!("Server exited with error: {}", error);
+                manager.abort();
+            }
         }
     }
 }

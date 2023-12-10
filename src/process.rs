@@ -46,7 +46,7 @@ pub async fn process(
     to_sample: usize,
     seed: u64,
     temperature: f64,
-    top_p: f64,
+    top_p: Option<f64>,
     repeat_last_n: usize,
     repeat_penalty: f32,
 ) {
@@ -65,7 +65,7 @@ pub async fn process(
         prompt_tokens
     };
     let mut all_tokens: Vec<u32> = vec![];
-    let mut logits_processor = LogitsProcessor::new(seed, Some(temperature), Some(top_p));
+    let mut logits_processor = LogitsProcessor::new(seed, Some(temperature), top_p);
     let mut next_token = {
         let input = Tensor::new(prompt_tokens.as_slice(), &Device::Cpu)
             .unwrap()
