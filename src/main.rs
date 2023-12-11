@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use axum::{routing::post, Router};
 use candle_core::utils::{get_num_threads, has_accelerate, has_mkl};
 use clap::Parser;
@@ -73,11 +75,16 @@ async fn main() {
 
     let cli_args = CLIArgs::parse();
 
+    info!("tokenizer_repo_id: {:?}", &cli_args.tokenizer_repo_id);
+    info!("model_repo_id: {:?}", &cli_args.model_repo_id);
+    info!("model_file_name: {:?}", &cli_args.model_file_name);
+    info!("initializing LLM, downloading tokenizer and model files...");
     let llm_builder = LLMBuilder::new()
         .tokenizer_repo_id(cli_args.tokenizer_repo_id)
         .model_repo_id(cli_args.model_repo_id)
         .model_file_name(cli_args.model_file_name);
     let mut llm = llm_builder.build().await.expect("Failed to build LLM");
+    info!("LLM initialized");
 
     let (tx, mut rx) = mpsc::channel(32);
     let manager = tokio::spawn(async move {
@@ -87,10 +94,12 @@ async fn main() {
         let to_sample = cli_args.to_sample;
         let repeat_last_n = cli_args.repeat_last_n;
         let repeat_penalty = cli_args.repeat_penalty;
+        info!("initializing LLM manager...");
         while let Some(cmd) = rx.recv().await {
             match cmd {
                 // handle Command::Prompt from `tx.send().await`;
                 Prompt { prompt, responder } => {
+                    info!("prompt:{}", prompt);
                     process(
                         prompt,
                         &mut llm,
@@ -109,16 +118,17 @@ async fn main() {
     });
 
     if cli_args.copilot_serve {
+        info!("starting copilot server on port: {}", &cli_args.port);
         let state = state::AppState { tx };
-        let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", cli_args.port))
-            .await
-            .unwrap();
+        let address = SocketAddr::from(([0, 0, 0, 0], cli_args.port));
+        let listener = tokio::net::TcpListener::bind(&address).await.unwrap();
         let app = app(state);
 
         match axum::serve(listener, app).await {
-            Ok(_) => info!("Server exited."),
+            Ok(_) => info!("copilot server exited."),
             Err(error) => {
-                info!("Server exited with error: {}", error);
+                info!("server exited with error: {}", error);
+                info!("terminating LLM manager");
                 manager.abort();
             }
         }
