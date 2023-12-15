@@ -143,7 +143,7 @@ async fn main() {
             let diff = get_diff();
             match diff {
                 Some(diff) => {
-                    let prompt = format!("<s>[INST] Summarize the git diff in one sentence no more then 15 words. The summary starts with 'fix: ' if the git diff fixes bugs. Starts with 'feat: ' if introducing a new feature. 'chore: ' for reformatting code or adding stuff around the build tools. 'docs: ' for documentations. Do not start with 'This git diff'. The summary should be concise but comprehensive covering what has changed and explaining why.\n{}\n [/INST]", diff);
+                    let prompt = format!("<s>[INST] Summarize the git diff in one sentence no more then 15 words. The summary starts with 'fix: ' if the git diff fixes bugs. Starts with 'feat: ' if introducing a new feature. 'chore: ' for reformatting code or adding stuff around the build tools. 'docs: ' for documentations. The summary should be concise but comprehensive covering what has changed and explaining why.\n{}\nDo NOT start with 'This git diff' or 'committed:'. [/INST]", diff);
                     let (responder, mut receiver) = mpsc::channel(8);
                     tx.send(Prompt { prompt, responder })
                         .await
