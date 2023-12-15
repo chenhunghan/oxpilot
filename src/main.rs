@@ -3,10 +3,11 @@ use std::net::SocketAddr;
 use axum::{routing::post, Router};
 use candle_core::utils::{get_num_threads, has_accelerate, has_mkl};
 use clap::Parser;
-use oxpilot::cli::CLIArgs;
+use oxpilot::cli::{CLICommands, CLI};
 use oxpilot::cmd::Command::Prompt;
 use oxpilot::llm::LLMBuilder;
 use oxpilot::process::process;
+use oxpilot::utils::diff::get_diff;
 use routes::completion::completion;
 use tokio::sync::mpsc;
 use tracing::info;
@@ -73,27 +74,29 @@ async fn main() {
     }
     info!("number of thread: {:?} used by candle", get_num_threads());
 
-    let cli_args = CLIArgs::parse();
+    let cli = CLI::parse();
 
-    info!("tokenizer_repo_id: {:?}", &cli_args.tokenizer_repo_id);
-    info!("model_repo_id: {:?}", &cli_args.model_repo_id);
-    info!("model_file_name: {:?}", &cli_args.model_file_name);
+    info!("tokenizer_repo_id: {:?}", &cli.tokenizer_repo_id);
+    info!("model_repo_id: {:?}", &cli.model_repo_id);
+    info!("model_file_name: {:?}", &cli.model_file_name);
     info!("initializing LLM, downloading tokenizer and model files...");
     let llm_builder = LLMBuilder::new()
-        .tokenizer_repo_id(cli_args.tokenizer_repo_id)
-        .model_repo_id(cli_args.model_repo_id)
-        .model_file_name(cli_args.model_file_name);
+        .tokenizer_repo_id(cli.tokenizer_repo_id)
+        .model_repo_id(cli.model_repo_id)
+        .model_file_name(cli.model_file_name);
     let mut llm = llm_builder.build().await.expect("Failed to build LLM");
     info!("LLM initialized");
 
     let (tx, mut rx) = mpsc::channel(32);
-    let manager = tokio::spawn(async move {
-        let seed = cli_args.seed;
-        let temperature: f64 = cli_args.temperature;
-        let top_p = cli_args.top_p;
-        let to_sample = cli_args.to_sample;
-        let repeat_last_n = cli_args.repeat_last_n;
-        let repeat_penalty = cli_args.repeat_penalty;
+    let _ = tokio::spawn(async move {
+        let seed = cli.seed;
+        let temperature: f64 = cli.temperature;
+        let top_p = cli.top_p;
+        let to_sample = cli.to_sample;
+        let repeat_last_n = cli.repeat_last_n;
+        let repeat_penalty = cli.repeat_penalty;
+        let eos_token = "</s>";
+        let max_sampled = 128;
         info!("initializing LLM manager...");
         while let Some(cmd) = rx.recv().await {
             match cmd {
@@ -110,6 +113,8 @@ async fn main() {
                         top_p,
                         repeat_last_n,
                         repeat_penalty,
+                        eos_token.to_string(),
+                        max_sampled,
                     )
                     .await;
                 }
@@ -117,20 +122,55 @@ async fn main() {
         }
     });
 
-    if cli_args.copilot_serve {
-        info!("starting copilot server on port: {}", &cli_args.port);
-        let state = state::AppState { tx };
-        let address = SocketAddr::from(([0, 0, 0, 0], cli_args.port));
-        let listener = tokio::net::TcpListener::bind(&address).await.unwrap();
-        let app = app(state);
+    match &cli.command {
+        Some(CLICommands::Serve { port }) => {
+            info!("starting copilot server on port: {}", &port);
+            let state = state::AppState { tx };
+            let address = SocketAddr::from(([0, 0, 0, 0], port.to_owned()));
+            let listener = tokio::net::TcpListener::bind(&address).await.unwrap();
+            let app = app(state);
 
-        match axum::serve(listener, app).await {
-            Ok(_) => info!("copilot server exited."),
-            Err(error) => {
-                info!("server exited with error: {}", error);
-                info!("terminating LLM manager");
-                manager.abort();
+            match axum::serve(listener, app).await {
+                Ok(_) => info!("copilot server exited."),
+                Err(error) => {
+                    info!("server exited with error: {}", error);
+                    info!("terminating LLM manager");
+                }
             }
+        }
+        Some(CLICommands::Commit { dry_run }) => {
+            info!("generating commit message for staged files...");
+            let diff = get_diff();
+            match diff {
+                Some(diff) => {
+                    let prompt = format!("<s>[INST] Summarize the git diff in one sentence no more then 15 words. The summary starts with 'fix: ' if the git diff fixes bugs. Starts with 'feat: ' if introducing a new feature. 'chore: ' for reformatting code or adding stuff around the build tools. 'docs: ' for documentations. Do not start with 'This git diff'. The summary should be concise but comprehensive covering what has changed and explaining why.\n{}\n [/INST]", diff);
+                    let (responder, mut receiver) = mpsc::channel(8);
+                    tx.send(Prompt { prompt, responder })
+                        .await
+                        .expect("failed to send prompt to LLM manager");
+                    let mut commit_message = String::new();
+                    while let Some(text) = receiver.recv().await {
+                        info!("text: {}", &text);
+                        commit_message.push_str(&text);
+                    }
+                    let commit_message = commit_message.trim();
+                    if *dry_run {
+                        info!("{}", &commit_message)
+                    } else {
+                        std::process::Command::new("git")
+                            .arg("commit")
+                            .arg("-m")
+                            .arg(&commit_message)
+                            .output()
+                            .expect("failed to execute commit");
+                        info!("committed:{}", &commit_message)
+                    }
+                }
+                None => info!("no diff found, have you staged any files?"),
+            }
+        }
+        None => {
+            info!("no operation specified, try `ox serve` or `ox --help` for more options");
         }
     }
 }
