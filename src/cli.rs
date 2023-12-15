@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "ox")]
@@ -6,13 +6,9 @@ use clap::Parser;
     about = "Pragmatic AI pipeline.",
     long_about = "Pragmatic AI pipeline for inter-process data flow."
 )]
-pub struct CLIArgs {
-    /// Wether to start the copilot server, default is false.
-    #[arg(short = 'c', long = "serve")]
-    pub copilot_serve: bool,
-    /// The port to bind the copilot server on, default to 9090, only used if --serve is set.
-    #[arg(short = 'p', long = "port", default_value = "9090")]
-    pub port: u16,
+pub struct CLI {
+    #[command(subcommand)]
+    pub command: Option<CLICommands>,
     /// The seed to use when generating random samples, default to 1.0
     #[arg(short = 't', long, default_value_t = 1.0)]
     pub temperature: f64,
@@ -32,7 +28,7 @@ pub struct CLIArgs {
     #[arg(long, default_value_t = 64)]
     pub repeat_last_n: usize,
     /// HG tokenizer repo id, default to "mistralai/Mistral-7B-v0.1"
-    #[arg(long, default_value = "mistralai/Mistral-7B-v0.1")]
+    #[arg(long, default_value = "mistralai/Mistral-7B-Instruct-v0.2")]
     pub tokenizer_repo_id: String,
     /// HG tokenizer repo revision, default to "main"
     #[arg(long, default_value = "main")]
@@ -41,12 +37,28 @@ pub struct CLIArgs {
     #[arg(long, default_value = "tokenizer.json")]
     pub tokenizer_file: String,
     // HG model repo id, default to "TheBloke/OpenHermes-2.5-Mistral-7B-GGUF"
-    #[arg(long, default_value = "TheBloke/OpenHermes-2.5-Mistral-7B-GGUF")]
+    #[arg(long, default_value = "TheBloke/Mistral-7B-Instruct-v0.2-GGUF")]
     pub model_repo_id: String,
     /// HG model repo revision, default to "main"
     #[arg(long, default_value = "main")]
     pub model_repo_revision: String,
     /// HG model repo GGMl/GGUF file, default to "openhermes-2.5-mistral-7b.Q4_K_M.gguf"
-    #[arg(long, default_value = "openhermes-2.5-mistral-7b.Q4_K_M.gguf")]
+    #[arg(long, default_value = "mistral-7b-instruct-v0.2.Q4_K_M.gguf")]
     pub model_file_name: String,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CLICommands {
+    /// Generate a commit message from staged files.
+    Commit {
+        /// Do not excute the action, only print the output, use it with --commit to generate a commit message without committing.
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+    },
+    /// Start the copilot server at `--port`, default to 9090.
+    Serve {
+        /// The port to bind the copilot server on, default to 9090, only used if `ox serve`.
+        #[arg(short = 'p', long = "port", default_value = "9090")]
+        port: u16,
+    },
 }
