@@ -14,11 +14,11 @@
 ox serve
 ```
 
-### Commmit with LLM
+### **_Auto_** Commmit with LLM
 
 ```sh
 git add . # staging files.
-ox commit # like `git commit -m` but with the LLM generated messages.
+ox commit # like `git commit` but with the LLM generated messages.
 ```
 
 ## Goal of this project
