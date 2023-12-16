@@ -66,6 +66,9 @@ pub enum CLICommands {
         /// Skip all prompts, and commit the generated commit message.
         #[arg(long = "yes", short = 'y')]
         all_yes: bool,
+        /// Same as git commit --signoff (-s)
+        #[arg(long = "signoff", short = 's')]
+        signoff: bool,
     },
     /// Start the copilot server at `--port`, default to 9090.
     Serve {
