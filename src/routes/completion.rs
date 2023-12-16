@@ -32,6 +32,7 @@ pub async fn completion(
         tx.send(Prompt {
             prompt,
             responder,
+            temperature: body.temperature.unwrap_or(1.0),
         }).await.unwrap();
 
         // the manager task will send the completion back to us via the `responder`.
