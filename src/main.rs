@@ -5,6 +5,7 @@ use axum::{routing::post, Router};
 use candle_core::utils::{get_num_threads, has_accelerate, has_mkl};
 use clap::Parser;
 use clap_verbosity_flag::Verbosity;
+use inquire::{Select, Text};
 use oxpilot::cli::{CLICommands, CLI};
 use oxpilot::cmd::Command::Prompt;
 use oxpilot::llm::LLMBuilder;
@@ -100,17 +101,14 @@ async fn main() {
     debug!("tokenizer_repo_id: {:?}", &cli.tokenizer_repo_id);
     debug!("model_repo_id: {:?}", &cli.model_repo_id);
     debug!("model_file_name: {:?}", &cli.model_file_name);
-    let mut spinner = SilentableSpinner::new(is_silent, Some("initializing LLM..."));
     let llm_builder = LLMBuilder::new()
         .tokenizer_repo_id(cli.tokenizer_repo_id)
         .model_repo_id(cli.model_repo_id)
         .model_file_name(cli.model_file_name);
-    spinner.update("building LLM...");
     let mut llm = llm_builder
         .build(is_silent)
         .await
         .expect("Failed to build LLM");
-    spinner.success("LLM initialized.");
 
     let (tx, mut rx) = mpsc::channel(32);
     let _ = tokio::spawn(async move {
@@ -172,17 +170,22 @@ async fn main() {
             );
             spinner.update("getting git diff of staged files...");
             let diff = get_diff(*function_context);
+            if diff.is_none() {
+                spinner.fail("no diff found, have you staged (`git add`) any files?");
+                std::process::exit(1);
+            } else if diff.is_some() {
+                let mut tip = "use --function-context to give more context to LLM";
+                let len = diff.clone().unwrap().len();
+                if len > 4000 {
+                    tip = "large diff will take longer to process and the generation quality will be worse, commit often please:s"
+                }
+                spinner.update(format!(
+                    "generating commit message... diff length:{} (tip: {})",
+                    len, tip
+                ));
+            }
             match diff {
                 Some(diff) => {
-                    let mut tip = "use --function-context to give more context to LLM";
-                    if diff.len() > 4000 {
-                        tip = "large diff will take longer to process and the generation quality will be worse, commit often please:s"
-                    }
-                    spinner.update(format!(
-                        "generating commit message... diff length:{} (tip: {})",
-                        diff.len(),
-                        tip
-                    ));
                     let prompt = mistral::instruct(format!("Summarize the git diff in one sentence no more then 15 words. The summary starts with 'fix: ' if the git diff fixes bugs. Starts with 'feat: ' if introducing a new feature. 'chore: ' for reformatting code or adding stuff around the build tools. 'docs: ' for documentations. The summary should be concise but comprehensive covering what has changed and explaining why.\n{}\nDo NOT start with 'This git diff' or 'committed:'.", diff));
 
                     let (responder, mut receiver) = mpsc::channel(8);
@@ -216,19 +219,51 @@ async fn main() {
                             spinner.update(commit_message.trim());
                         }
                     }
-                    if *dry_run {
-                        spinner.success(&format!("[dry-run]:'{}'", commit_message));
-                    } else {
-                        std::process::Command::new("git")
-                            .arg("commit")
-                            .arg("-m")
-                            .arg(&commit_message)
-                            .output()
-                            .expect("failed to execute commit");
-                        spinner.success(&format!("[commit]:'{}'", commit_message));
+                    spinner.success(&format!("generated:'{}'", commit_message));
+                    if !*dry_run {
+                        let options: Vec<&str> = vec!["Commit", "Edit"];
+
+                        match Select::new(
+                            "Commit or edit the message? (tip: use --yes to skip this prompt)",
+                            options,
+                        )
+                        .prompt()
+                        {
+                            Ok(choice) => {
+                                if choice == "Commit" {
+                                    std::process::Command::new("git")
+                                        .arg("commit")
+                                        .arg("-m")
+                                        .arg(&commit_message)
+                                        .output()
+                                        .expect("failed to execute commit");
+
+                                    return;
+                                }
+                                if choice == "Edit" {
+                                    let edited_message =
+                                        Text::new("✏️").with_initial_value(&commit_message).prompt();
+                                    match edited_message {
+                                        Ok(edited_message) => {
+                                            std::process::Command::new("git")
+                                                .arg("commit")
+                                                .arg("-m")
+                                                .arg(&edited_message)
+                                                .output()
+                                                .expect("failed to execute commit");
+                                        }
+                                        // user pressed ctrl-c, just exit the program
+                                        Err(_) => std::process::exit(0),
+                                    }
+                                    return;
+                                }
+                            }
+                            Err(_) => std::process::exit(1),
+                        }
                     }
                 }
-                None => spinner.fail("no diff found, have you staged (`git add`) any files?"),
+                // diff.is_none() is checked above so we panic here
+                None => panic!("no diff found, have you staged (`git add`) any files?"),
             }
         }
         Some(CLICommands::Any(args)) => {
