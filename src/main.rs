@@ -113,7 +113,6 @@ async fn main() {
     let (tx, mut rx) = mpsc::channel(32);
     let _ = tokio::spawn(async move {
         let seed = cli.seed;
-        let temperature: f64 = cli.temperature;
         let top_p = cli.top_p;
         let to_sample = cli.to_sample;
         let repeat_last_n = cli.repeat_last_n;
@@ -123,7 +122,11 @@ async fn main() {
         while let Some(cmd) = rx.recv().await {
             match cmd {
                 // handle Command::Prompt from `tx.send().await`;
-                Prompt { prompt, responder } => {
+                Prompt {
+                    prompt,
+                    responder,
+                    temperature,
+                } => {
                     debug!("prompt:{}", prompt);
                     process(
                         prompt,
@@ -192,6 +195,7 @@ async fn main() {
                     tx.send(Prompt {
                         prompt: prompt.clone(),
                         responder,
+                        temperature: 0.8,
                     })
                     .await
                     .expect("failed to send prompt to LLM manager");
@@ -210,6 +214,7 @@ async fn main() {
                         tx.send(Prompt {
                             prompt: prompt.clone(),
                             responder,
+                            temperature: 1.2,
                         })
                         .await
                         .expect("failed to send prompt to LLM manager");
@@ -297,9 +302,13 @@ async fn main() {
                     }
                     let prompt = mistral::instruct(input);
                     let (responder, mut receiver) = mpsc::channel(8);
-                    tx.send(Prompt { prompt, responder })
-                        .await
-                        .expect("failed to send prompt to LLM manager");
+                    tx.send(Prompt {
+                        prompt,
+                        responder,
+                        temperature: 1.0,
+                    })
+                    .await
+                    .expect("failed to send prompt to LLM manager");
                     let mut last = String::new();
                     while let Some(text) = receiver.recv().await {
                         print!("{text}");
