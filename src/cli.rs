@@ -59,9 +59,9 @@ pub enum CLICommands {
         /// Do not excute the action, only print the output, use it with --commit to generate a commit message without committing.
         #[arg(long = "dry-run")]
         dry_run: bool,
-        /// Generate the diff with function context, default to true. Set to false to reduce the diff size to speed up the generation.
+        /// Generate the diff with function context, default is disabled. Enable it with `--function-context` to give more context to LLM.
         /// https://git-scm.com/docs/git-diff#Documentation/git-diff.txt---function-context
-        #[arg(long = "function-context", default_value = "true")]
+        #[arg(long = "function-context")]
         function_context: bool,
     },
     /// Start the copilot server at `--port`, default to 9090.
