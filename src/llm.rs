@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
 
+use crate::utils::spinner::SilentableSpinner;
+
 /// In this file we are using the "Builder" pattern to create `LLM` struc instances. "Builder" pattern is a common design
 /// pattern that used in Rust. It is a creational pattern that lets you construct complex objects step by step.
 /// See https://github.com/chenhunghan/oxpilot/pull/1
@@ -195,7 +197,12 @@ impl LLMBuilder<ReadyState> {
         self
     }
 
-    pub async fn build(self) -> Result<LLM> {
+    pub async fn build(self, is_silent: bool) -> Result<LLM> {
+        let mut spinner = SilentableSpinner::new(
+            is_silent,
+            Some(format!("building LLM, this may take a while...",)),
+        );
+
         let tokenizer_repo_id = self
             .tokenizer_repo_id
             .context("tokenizer_repo_id is None, forgot to .tokenizer_repo_id()?")?;
@@ -231,10 +238,12 @@ impl LLMBuilder<ReadyState> {
             hf_hub::RepoType::Model,
             tokenizer_repo_revision.to_owned(),
         ));
+        spinner.update("fetching tokenizer file...");
         let tokenizer_file_path = tokenizer_repo
             .get(&tokenizer_file_name)
             .await
             .context("Failed to fetch tokenizer file")?;
+        spinner.update("initializing tokenizer...");
         let tokenizer = match tokenizers::Tokenizer::from_file(tokenizer_file_path) {
             Ok(tokenizer) => tokenizer,
             Err(error) => {
@@ -255,10 +264,13 @@ impl LLMBuilder<ReadyState> {
             hf_hub::RepoType::Model,
             model_repo_revision.to_owned(),
         ));
+        spinner.update("fetching model weights... (this may take a while)");
         let model_file_path = model_repo
             .get(&model_file_name)
             .await
             .context("Failed to fetch model file")?;
+
+        spinner.update("initializing model weights...");
         let mut model_file =
             std::fs::File::open(model_file_path).context("Failed to open model file")?;
         let model_content = candle_core::quantized::gguf_file::Content::read(&mut model_file)
@@ -268,6 +280,7 @@ impl LLMBuilder<ReadyState> {
             &mut model_file,
         )
         .context("Failed creating model weights from gguf")?;
+        spinner.success("LLM built successfully.");
 
         Ok(LLM {
             tokenizer_repo_id,
