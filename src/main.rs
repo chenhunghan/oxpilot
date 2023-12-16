@@ -24,6 +24,7 @@ pub mod process;
 pub mod routes;
 pub mod state;
 pub mod token;
+pub mod utils;
 
 // The `#[tokio::main]` function is a macro. It transforms the async fn main()
 // into a synchronous fn main() that initializes a runtime instance and executes the async main function.
