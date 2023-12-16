@@ -4,7 +4,7 @@ use std::ffi::OsString;
 #[derive(Parser)]
 #[command(name = "ox")]
 #[command(
-    about = "Pragmatic AI pipeline.",
+    about = "Pragmatic AI pipeline!",
     long_about = "Pragmatic AI pipeline for inter-process data flow."
 )]
 pub struct CLI {
