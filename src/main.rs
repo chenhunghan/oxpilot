@@ -1,17 +1,24 @@
+use std::io::Write;
 use std::net::SocketAddr;
 
 use axum::{routing::post, Router};
 use candle_core::utils::{get_num_threads, has_accelerate, has_mkl};
 use clap::Parser;
+use clap_verbosity_flag::Verbosity;
 use oxpilot::cli::{CLICommands, CLI};
 use oxpilot::cmd::Command::Prompt;
 use oxpilot::llm::LLMBuilder;
 use oxpilot::process::process;
 use oxpilot::utils::diff::get_diff;
+use oxpilot::utils::mistral;
+use oxpilot::utils::spinner::SilentableSpinner;
+use regex::Regex;
 use routes::completion::completion;
 use tokio::sync::mpsc;
-use tracing::info;
+use tracing::{debug, error, info, warn};
+use tracing_log::{log, AsTrace};
 use tracing_subscriber::fmt::format::FmtSpan;
+
 pub mod llm;
 pub mod process;
 pub mod routes;
@@ -37,29 +44,44 @@ pub mod token;
 // ```
 #[tokio::main]
 async fn main() {
+    // Parse command line arguments
+    let cli = CLI::parse();
+
+    let verbosity: &Verbosity = &cli.verbose;
+    let is_silent: bool = verbosity.is_silent();
+    let log_level = verbosity.log_level();
+    let is_debug = match log_level {
+        Some(log_level) => log_level == log::Level::Debug,
+        None => false,
+    };
+
     // The tracing crate is a framework for instrumenting Rust programs to
     // collect structured, event-based diagnostic information.
     // https://github.com/tokio-rs/tracing
     // https://tokio.rs/tokio/topics/tracing
     // Start configuring a `fmt` subscriber
     let subscriber = tracing_subscriber::fmt()
+        // Set log level by `-v` or `-vv` or `-vvv` or `-vvvv` or `-vvvvv
+        .with_max_level(cli.verbose.log_level_filter().as_trace());
+    let format = tracing_subscriber::fmt::format()
         // Use a more compact, abbreviated log format
         .compact()
         // Display source code file paths
-        .with_file(true)
+        .with_file(is_debug)
         // Display source code line numbers
-        .with_line_number(true)
+        .with_line_number(is_debug)
         // Display the thread ID an event was recorded on
-        .with_thread_ids(true)
+        .with_thread_ids(is_debug)
         // Display the event's target (module path)
-        .with_target(true)
-        // Add span events
-        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
-        // Build the subscriber
-        .finish();
+        .with_target(is_debug);
 
     // Set the subscriber as the default
-    match tracing::subscriber::set_global_default(subscriber) {
+    match tracing::subscriber::set_global_default(
+        subscriber
+            .event_format(format)
+            .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
+            .finish(),
+    ) {
         Ok(_) => (),
         Err(error) => panic!(
             "error setting default tracer as `fmt` subscriber {:?}",
@@ -74,18 +96,20 @@ async fn main() {
     }
     info!("number of thread: {:?} used by candle", get_num_threads());
 
-    let cli = CLI::parse();
-
-    info!("tokenizer_repo_id: {:?}", &cli.tokenizer_repo_id);
-    info!("model_repo_id: {:?}", &cli.model_repo_id);
-    info!("model_file_name: {:?}", &cli.model_file_name);
-    info!("initializing LLM, downloading tokenizer and model files...");
+    debug!("tokenizer_repo_id: {:?}", &cli.tokenizer_repo_id);
+    debug!("model_repo_id: {:?}", &cli.model_repo_id);
+    debug!("model_file_name: {:?}", &cli.model_file_name);
+    let mut spinner = SilentableSpinner::new(is_silent, Some("initializing LLM..."));
     let llm_builder = LLMBuilder::new()
         .tokenizer_repo_id(cli.tokenizer_repo_id)
         .model_repo_id(cli.model_repo_id)
         .model_file_name(cli.model_file_name);
-    let mut llm = llm_builder.build().await.expect("Failed to build LLM");
-    info!("LLM initialized");
+    spinner.update("building LLM...");
+    let mut llm = llm_builder
+        .build(is_silent)
+        .await
+        .expect("Failed to build LLM");
+    spinner.success("LLM initialized.");
 
     let (tx, mut rx) = mpsc::channel(32);
     let _ = tokio::spawn(async move {
@@ -97,12 +121,11 @@ async fn main() {
         let repeat_penalty = cli.repeat_penalty;
         let eos_token = "</s>";
         let max_sampled = 128;
-        info!("initializing LLM manager...");
         while let Some(cmd) = rx.recv().await {
             match cmd {
                 // handle Command::Prompt from `tx.send().await`;
                 Prompt { prompt, responder } => {
-                    info!("prompt:{}", prompt);
+                    debug!("prompt:{}", prompt);
                     process(
                         prompt,
                         &mut llm,
@@ -138,24 +161,57 @@ async fn main() {
                 }
             }
         }
-        Some(CLICommands::Commit { dry_run }) => {
-            info!("generating commit message for staged files...");
-            let diff = get_diff();
+        Some(CLICommands::Commit {
+            dry_run,
+            function_context,
+        }) => {
+            let mut spinner = SilentableSpinner::new(
+                is_silent,
+                Some("generating commit message for staged files..."),
+            );
+            spinner.update("getting git diff of staged files...");
+            let diff = get_diff(*function_context);
             match diff {
                 Some(diff) => {
-                    let prompt = format!("<s>[INST] Summarize the git diff in one sentence no more then 15 words. The summary starts with 'fix: ' if the git diff fixes bugs. Starts with 'feat: ' if introducing a new feature. 'chore: ' for reformatting code or adding stuff around the build tools. 'docs: ' for documentations. The summary should be concise but comprehensive covering what has changed and explaining why.\n{}\nDo NOT start with 'This git diff' or 'committed:'. [/INST]", diff);
+                    spinner.update(format!(
+                        "generating commit message... diff length:{} (tip: use --function-context to give more context to LLM)",
+                        diff.len()
+                    ));
+                    let prompt = mistral::instruct(format!("Summarize the git diff in one sentence no more then 15 words. The summary starts with 'fix: ' if the git diff fixes bugs. Starts with 'feat: ' if introducing a new feature. 'chore: ' for reformatting code or adding stuff around the build tools. 'docs: ' for documentations. The summary should be concise but comprehensive covering what has changed and explaining why.\n{}\nDo NOT start with 'This git diff' or 'committed:'.", diff));
+
                     let (responder, mut receiver) = mpsc::channel(8);
-                    tx.send(Prompt { prompt, responder })
-                        .await
-                        .expect("failed to send prompt to LLM manager");
+                    tx.send(Prompt {
+                        prompt: prompt.clone(),
+                        responder,
+                    })
+                    .await
+                    .expect("failed to send prompt to LLM manager");
+
                     let mut commit_message = String::new();
                     while let Some(text) = receiver.recv().await {
-                        info!("text: {}", &text);
                         commit_message.push_str(&text);
+                        spinner.update(commit_message.trim());
                     }
-                    let commit_message = commit_message.trim();
+                    commit_message = commit_message.trim().to_string();
+                    let regex = Regex::new(r"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)").unwrap();
+
+                    if !regex.is_match(&commit_message) {
+                        spinner.update("retry because commit message does not match the conventional commits specification...");
+                        let (responder, mut receiver) = mpsc::channel(8);
+                        tx.send(Prompt {
+                            prompt: prompt.clone(),
+                            responder,
+                        })
+                        .await
+                        .expect("failed to send prompt to LLM manager");
+                        commit_message = String::new();
+                        while let Some(text) = receiver.recv().await {
+                            commit_message.push_str(&text);
+                            spinner.update(commit_message.trim());
+                        }
+                    }
                     if *dry_run {
-                        info!("{}", &commit_message)
+                        spinner.success(&format!("[dry-run]:'{}'", commit_message));
                     } else {
                         std::process::Command::new("git")
                             .arg("commit")
@@ -163,14 +219,59 @@ async fn main() {
                             .arg(&commit_message)
                             .output()
                             .expect("failed to execute commit");
-                        info!("committed:{}", &commit_message)
+                        spinner.success(&format!("[commit]:'{}'", commit_message));
                     }
                 }
-                None => info!("no diff found, have you staged any files?"),
+                None => spinner.fail("no diff found, have you staged (`git add`) any files?"),
+            }
+        }
+        Some(CLICommands::Any(args)) => {
+            let arg0 = args[0].clone().into_string();
+            match arg0 {
+                Ok(arg0) => {
+                    let mut input = arg0.clone();
+                    for arg in args.iter().skip(1) {
+                        let next_arg_string = arg.clone().into_string();
+                        match next_arg_string {
+                            Ok(next_arg_string) => {
+                                input.push_str(&format!(" {}", next_arg_string));
+                            }
+                            Err(cause) => {
+                                warn! {
+                                    cause = format!("{:#?}", cause),
+                                    "failed to parse input arguments"
+                                };
+                            }
+                        }
+                    }
+                    let prompt = mistral::instruct(input);
+                    let (responder, mut receiver) = mpsc::channel(8);
+                    tx.send(Prompt { prompt, responder })
+                        .await
+                        .expect("failed to send prompt to LLM manager");
+                    let mut last = String::new();
+                    while let Some(text) = receiver.recv().await {
+                        print!("{text}");
+                        last = text;
+                        std::io::stdout().flush().expect("failed to flush stdout");
+                    }
+                    // print a newline if the last text does not end with a newline
+                    // prevent https://unix.stackexchange.com/questions/167582/why-zsh-ends-a-line-with-a-highlighted-percent-symbol
+                    if last != "\n" {
+                        print!("\n");
+                        std::io::stdout().flush().expect("failed to flush stdout");
+                    }
+                }
+                Err(cause) => {
+                    warn! {
+                        cause = format!("{:#?}", cause),
+                        "failed to parse input arguments"
+                    };
+                }
             }
         }
         None => {
-            info!("no operation specified, try `ox serve` or `ox --help` for more options");
+            error!("no operation specified, try `ox serve` or `ox --help` for more options");
         }
     }
 }
