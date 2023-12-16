@@ -63,6 +63,9 @@ pub enum CLICommands {
         /// https://git-scm.com/docs/git-diff#Documentation/git-diff.txt---function-context
         #[arg(long = "function-context")]
         function_context: bool,
+        /// Skip all prompts, and commit the generated commit message.
+        #[arg(long = "yes", short = 'y')]
+        all_yes: bool,
     },
     /// Start the copilot server at `--port`, default to 9090.
     Serve {
