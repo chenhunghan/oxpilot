@@ -231,31 +231,41 @@ async fn main() {
                         {
                             Ok(choice) => {
                                 if choice == "Commit" {
-                                    std::process::Command::new("git")
+                                    let output = std::process::Command::new("git")
                                         .arg("commit")
                                         .arg("-m")
                                         .arg(&commit_message)
                                         .output()
                                         .expect("failed to execute commit");
+                                    if output.stdout.len() > 0 {
+                                        println!("{}", String::from_utf8_lossy(&output.stdout));
+                                    }
 
-                                    return;
+                                    std::process::exit(0);
                                 }
                                 if choice == "Edit" {
                                     let edited_message =
                                         Text::new("✏️").with_initial_value(&commit_message).prompt();
                                     match edited_message {
                                         Ok(edited_message) => {
-                                            std::process::Command::new("git")
+                                            let output = std::process::Command::new("git")
                                                 .arg("commit")
                                                 .arg("-m")
                                                 .arg(&edited_message)
                                                 .output()
                                                 .expect("failed to execute commit");
+                                            if output.stdout.len() > 0 {
+                                                println!(
+                                                    "{}",
+                                                    String::from_utf8_lossy(&output.stdout)
+                                                );
+                                            }
+
+                                            std::process::exit(0);
                                         }
                                         // user pressed ctrl-c, just exit the program
                                         Err(_) => std::process::exit(0),
                                     }
-                                    return;
                                 }
                             }
                             Err(_) => std::process::exit(1),
