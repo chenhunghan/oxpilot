@@ -176,7 +176,7 @@ async fn main() {
                 Some(diff) => {
                     let mut tip = "use --function-context to give more context to LLM";
                     if diff.len() > 4000 {
-                        tip = "large diff will take longer to process and the quality of the commit message will be worse, commit often please :s"
+                        tip = "large diff will take longer to process and the generation quality will be worse, commit often please:s"
                     }
                     spinner.update(format!(
                         "generating commit message... diff length:{} (tip: {})",
