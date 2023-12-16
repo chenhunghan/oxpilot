@@ -166,6 +166,7 @@ async fn main() {
         Some(CLICommands::Commit {
             dry_run,
             function_context,
+            all_yes,
         }) => {
             let mut spinner = SilentableSpinner::new(
                 is_silent,
@@ -226,6 +227,19 @@ async fn main() {
                     }
                     spinner.success(&format!("generated:'{}'", commit_message));
                     if !*dry_run {
+                        if *all_yes {
+                            let output = std::process::Command::new("git")
+                                .arg("commit")
+                                .arg("-m")
+                                .arg(&commit_message)
+                                .output()
+                                .expect("failed to execute commit");
+                            if output.stdout.len() > 0 {
+                                println!("{}", String::from_utf8_lossy(&output.stdout));
+                            }
+
+                            std::process::exit(0);
+                        }
                         let options: Vec<&str> = vec!["Commit", "Edit"];
 
                         match Select::new(
