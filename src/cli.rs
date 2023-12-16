@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use std::ffi::OsString;
 
 #[derive(Parser)]
 #[command(name = "ox")]
@@ -9,6 +10,10 @@ use clap::{Parser, Subcommand};
 pub struct CLI {
     #[command(subcommand)]
     pub command: Option<CLICommands>,
+    /// Change tracing verbose level, `-q` print nothing, not even errors, no `-v` flag (default) = print errors only, `-vv` = print errors and warnings,
+    /// `-vvv` = print errors, warnings, and info `-vvvv` = print errors, warnings, info, and debug, `-vvvvv` = print everything including trace
+    #[command(flatten)]
+    pub verbose: clap_verbosity_flag::Verbosity,
     /// The seed to use when generating random samples, default to 1.0
     #[arg(short = 't', long, default_value_t = 1.0)]
     pub temperature: f64,
@@ -54,6 +59,10 @@ pub enum CLICommands {
         /// Do not excute the action, only print the output, use it with --commit to generate a commit message without committing.
         #[arg(long = "dry-run")]
         dry_run: bool,
+        /// Generate the diff with function context, default to true. Set to false to reduce the diff size to speed up the generation.
+        /// https://git-scm.com/docs/git-diff#Documentation/git-diff.txt---function-context
+        #[arg(long = "function-context", default_value = "true")]
+        function_context: bool,
     },
     /// Start the copilot server at `--port`, default to 9090.
     Serve {
@@ -61,4 +70,7 @@ pub enum CLICommands {
         #[arg(short = 'p', long = "port", default_value = "9090")]
         port: u16,
     },
+    /// Arbitrary inputs will be parsed as prompt. e.g. `ox How are you today?` will generate the response by prompting "How are you today?".
+    #[command(external_subcommand)]
+    Any(Vec<OsString>),
 }
