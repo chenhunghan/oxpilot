@@ -4,5 +4,6 @@ pub enum Command {
     Prompt {
         prompt: String,
         responder: Responder<String>,
+        temperature: f64,
     },
 }
