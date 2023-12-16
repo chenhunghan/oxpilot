@@ -174,9 +174,14 @@ async fn main() {
             let diff = get_diff(*function_context);
             match diff {
                 Some(diff) => {
+                    let mut tip = "use --function-context to give more context to LLM";
+                    if diff.len() > 4000 {
+                        tip = "large diff will take longer to process and the quality of the commit message will be worse, commit often :)"
+                    }
                     spinner.update(format!(
-                        "generating commit message... diff length:{} (tip: use --function-context to give more context to LLM)",
-                        diff.len()
+                        "generating commit message... diff length:{} (tip: {})",
+                        diff.len(),
+                        tip
                     ));
                     let prompt = mistral::instruct(format!("Summarize the git diff in one sentence no more then 15 words. The summary starts with 'fix: ' if the git diff fixes bugs. Starts with 'feat: ' if introducing a new feature. 'chore: ' for reformatting code or adding stuff around the build tools. 'docs: ' for documentations. The summary should be concise but comprehensive covering what has changed and explaining why.\n{}\nDo NOT start with 'This git diff' or 'committed:'.", diff));
 
