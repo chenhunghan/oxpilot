@@ -1,8 +1,8 @@
-use tracing::warn;
+use tokio::process::Command;
 
 /// Get the diff of the staged files. None if there is no diff/failed to get the diff.
-pub fn get_diff(function_context: bool) -> Option<String> {
-    let mut git = std::process::Command::new("git");
+pub async fn get_diff(function_context: bool) -> String {
+    let mut git = Command::new("git");
     git.arg("diff")
         .arg("--staged")
         .arg("--ignore-all-space")
@@ -14,21 +14,6 @@ pub fn get_diff(function_context: bool) -> Option<String> {
     if function_context {
         git.arg("--function-context");
     }
-    let output = git.output().expect("failed to execute diff");
-    if output.status.success() {
-        match String::from_utf8(output.stdout) {
-            Ok(stdout) => {
-                if stdout.len() > 0 {
-                    return Some(stdout);
-                }
-                None
-            }
-            Err(e) => {
-                warn!("failed to parse diff output: {:?}", e);
-                None
-            }
-        }
-    } else {
-        None
-    }
+    let output = git.output().await.expect("failed to execute diff");
+    return String::from_utf8(output.stdout).expect("failed to parse diff stdout");
 }
