@@ -170,17 +170,21 @@ async fn main() {
             all_yes,
             signoff,
         }) => {
-            let tip = "large diff will take longer to process and the generation quality will be worse, commit often please 😊";
             let mut spinner = SilentableSpinner::new(
                 is_silent,
-                Some(format!("generating commit message... (tip: {})", tip)),
+                Some("generating commit message for staged files..."),
             );
+            spinner.update("getting git diff of staged files...");
             let diff = get_diff(*function_context).await;
             if diff.len() == 0 {
-                println!("🤷 no diff found, have you staged (`git add`) any files?");
+                spinner.fail("no diff found, have you staged any?");
                 std::process::exit(1);
             }
-
+            let mut tip = "--function-context to give context to LLM";
+            if diff.len() > 800 {
+                tip = "large diff will take longer, commit often 😊"
+            }
+            spinner.update(format!("generating commit message... (tip: {})", tip));
             let prompt = mistral::instruct(format!("Summarize the git diff in one sentence no more then 15 words. The summary starts with 'fix: ' if the git diff fixes bugs. Starts with 'feat: ' if introducing a new feature. 'chore: ' for reformatting code or adding stuff around the build tools. 'docs: ' for documentations. The summary should be concise but comprehensive covering what has changed and explaining why.\n{}\nDo NOT start with 'This git diff' or 'committed:'.", diff));
 
             let (responder, mut receiver) = mpsc::channel(8);
