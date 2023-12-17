@@ -180,7 +180,7 @@ async fn main() {
                 spinner.fail("no diff found, have you staged any?");
                 std::process::exit(1);
             }
-            let mut tip = "--function-context to give context to LLM";
+            let mut tip = "--function-context adds context to LLM";
             if diff.len() > 800 {
                 tip = "large diff takes longer, commit often 😊"
             }
@@ -206,7 +206,9 @@ async fn main() {
             let regex = Regex::new(r"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)").unwrap();
 
             if !regex.is_match(&commit_message) {
-                spinner.update("retry because commit message does not match the conventional commits specification...");
+                spinner.update(
+                    "retry because the message not match the conventional commits specification...",
+                );
                 let (responder, mut receiver) = mpsc::channel(8);
                 tx.send(Prompt {
                     prompt: prompt.clone(),
