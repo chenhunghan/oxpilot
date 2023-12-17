@@ -60,7 +60,7 @@ eventsource-stream = "0.2.3"
 
 # The profile that 'cargo dist' will build with
 [profile.dist]
-features = ["accelerate", "mkl"]
+features = ["accelerate"]
 inherits = "release"
 lto = "thin"
 
