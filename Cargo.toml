@@ -9,9 +9,28 @@ repository = "https://github.com/chenhunghan/oxpilot/"
 name = "ox"
 path = "src/main.rs"
 
+[features]
+accelerate = [
+  "dep:accelerate-src",
+  "candle-core/accelerate",
+  "candle-nn/accelerate",
+  "candle-transformers/accelerate",
+]
+mkl = [
+  "dep:intel-mkl-src",
+  "candle-core/mkl",
+  "candle-nn/mkl",
+  "candle-transformers/mkl",
+]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+accelerate-src = { version = "0.3.2", optional = true }
+intel-mkl-src = { version = "0.8.1", features = [
+  "mkl-static-lp64-iomp",
+], optional = true }
 tokio = { version = "1.32.0", features = ["full"] }
 hf-hub = { version = "0.3.1", features = ["tokio"] }
 tokenizers = "0.15.0"
@@ -41,6 +60,7 @@ eventsource-stream = "0.2.3"
 
 # The profile that 'cargo dist' will build with
 [profile.dist]
+features = ["accelerate", "mkl"]
 inherits = "release"
 lto = "thin"
 
