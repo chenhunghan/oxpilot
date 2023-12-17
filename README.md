@@ -1,6 +1,6 @@
 # `oxpilot` - rusty AI copilot
 
-`oxpilot` is a CLI powered by LLM (large language models) written in Rust 🦀. It's built on top of [candle](https://github.com/huggingface/candle), with aims to be minimalist, fast, and accessable (in terms of computing resource).
+`oxpilot` is a CLI powered by LLM (currently [Mistral-7B-Instruct-v0.2](https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2)) written in Rust 🦀. It's built on top of [candle](https://github.com/huggingface/candle), with aims to be minimalist, fast, and accessable (in terms of computing resource).
 
 <p align="center">
   <img src="./doc/img/rusty-copilot.jpeg" width="320" height="320" alt="A rusty programming copilot" />
@@ -38,7 +38,7 @@ Who doesn't want to chat with AI?
 ox hi in Japanese
 ```
 
-### **_Auto_** Commmit with LLM
+### **_AI_** Commmit with LLM
 
 I am very lazy at drafting a comprehensive commit message, why not make LLM genereate one for me according to `git diff`? Don't worry, `ox` will ask your confirmation before commit the changes/messages.
 
