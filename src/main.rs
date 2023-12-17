@@ -200,7 +200,9 @@ async fn main() {
             let mut commit_message = String::new();
             while let Some(text) = receiver.recv().await {
                 commit_message.push_str(&text);
-                spinner.update(commit_message.trim());
+                if commit_message.len() < 90 {
+                    spinner.update(commit_message.trim());
+                }
             }
             commit_message = commit_message.trim().to_string();
             let regex = Regex::new(r"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)").unwrap();
@@ -221,7 +223,9 @@ async fn main() {
                 commit_message = String::new();
                 while let Some(text) = receiver.recv().await {
                     commit_message.push_str(&text);
-                    spinner.update(commit_message.trim());
+                    if commit_message.len() < 90 {
+                        spinner.update(commit_message.trim());
+                    }
                 }
             }
             spinner.success(&format!("generated:'{}'", commit_message));
