@@ -205,6 +205,7 @@ async fn main() {
                 }
             }
             commit_message = commit_message.trim().to_string();
+            // from https://gist.github.com/marcojahn/482410b728c31b221b70ea6d2c433f0c
             let regex = Regex::new(r"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)").unwrap();
 
             if !regex.is_match(&commit_message) {
