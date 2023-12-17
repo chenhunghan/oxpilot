@@ -10,6 +10,7 @@ use oxpilot::cli::{CLICommands, CLI};
 use oxpilot::cmd::Command::Prompt;
 use oxpilot::llm::LLMBuilder;
 use oxpilot::process::process;
+use oxpilot::utils::commit::commit_then_exit;
 use oxpilot::utils::diff::get_diff;
 use oxpilot::utils::mistral;
 use oxpilot::utils::spinner::SilentableSpinner;
@@ -167,132 +168,85 @@ async fn main() {
             dry_run,
             function_context,
             all_yes,
+            signoff,
         }) => {
+            let tip = "large diff will take longer to process and the generation quality will be worse, commit often please 😊";
             let mut spinner = SilentableSpinner::new(
                 is_silent,
-                Some("generating commit message for staged files..."),
+                Some(format!("generating commit message... (tip: {})", tip)),
             );
-            spinner.update("getting git diff of staged files...");
-            let diff = get_diff(*function_context);
-            if diff.is_none() {
-                spinner.fail("no diff found, have you staged (`git add`) any files?");
+            let diff = get_diff(*function_context).await;
+            if diff.len() == 0 {
+                println!("🤷 no diff found, have you staged (`git add`) any files?");
                 std::process::exit(1);
-            } else if diff.is_some() {
-                let mut tip = "use --function-context to give more context to LLM";
-                let len = diff.clone().unwrap().len();
-                if len > 4000 {
-                    tip = "large diff will take longer to process and the generation quality will be worse, commit often please:s"
-                }
-                spinner.update(format!(
-                    "generating commit message... diff length:{} (tip: {})",
-                    len, tip
-                ));
             }
-            match diff {
-                Some(diff) => {
-                    let prompt = mistral::instruct(format!("Summarize the git diff in one sentence no more then 15 words. The summary starts with 'fix: ' if the git diff fixes bugs. Starts with 'feat: ' if introducing a new feature. 'chore: ' for reformatting code or adding stuff around the build tools. 'docs: ' for documentations. The summary should be concise but comprehensive covering what has changed and explaining why.\n{}\nDo NOT start with 'This git diff' or 'committed:'.", diff));
 
-                    let (responder, mut receiver) = mpsc::channel(8);
-                    tx.send(Prompt {
-                        prompt: prompt.clone(),
-                        responder,
-                        temperature: 0.8,
-                    })
-                    .await
-                    .expect("failed to send prompt to LLM manager");
+            let prompt = mistral::instruct(format!("Summarize the git diff in one sentence no more then 15 words. The summary starts with 'fix: ' if the git diff fixes bugs. Starts with 'feat: ' if introducing a new feature. 'chore: ' for reformatting code or adding stuff around the build tools. 'docs: ' for documentations. The summary should be concise but comprehensive covering what has changed and explaining why.\n{}\nDo NOT start with 'This git diff' or 'committed:'.", diff));
 
-                    let mut commit_message = String::new();
-                    while let Some(text) = receiver.recv().await {
-                        commit_message.push_str(&text);
-                        spinner.update(commit_message.trim());
-                    }
-                    commit_message = commit_message.trim().to_string();
-                    let regex = Regex::new(r"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)").unwrap();
+            let (responder, mut receiver) = mpsc::channel(8);
+            tx.send(Prompt {
+                prompt: prompt.clone(),
+                responder,
+                temperature: 0.8,
+            })
+            .await
+            .expect("failed to send prompt to LLM manager");
 
-                    if !regex.is_match(&commit_message) {
-                        spinner.update("retry because commit message does not match the conventional commits specification...");
-                        let (responder, mut receiver) = mpsc::channel(8);
-                        tx.send(Prompt {
-                            prompt: prompt.clone(),
-                            responder,
-                            temperature: 1.2,
-                        })
-                        .await
-                        .expect("failed to send prompt to LLM manager");
-                        commit_message = String::new();
-                        while let Some(text) = receiver.recv().await {
-                            commit_message.push_str(&text);
-                            spinner.update(commit_message.trim());
-                        }
-                    }
-                    spinner.success(&format!("generated:'{}'", commit_message));
-                    if !*dry_run {
-                        if *all_yes {
-                            let output = std::process::Command::new("git")
-                                .arg("commit")
-                                .arg("-m")
-                                .arg(&commit_message)
-                                .output()
-                                .expect("failed to execute commit");
-                            if output.stdout.len() > 0 {
-                                println!("{}", String::from_utf8_lossy(&output.stdout));
-                            }
+            let mut commit_message = String::new();
+            while let Some(text) = receiver.recv().await {
+                commit_message.push_str(&text);
+                spinner.update(commit_message.trim());
+            }
+            commit_message = commit_message.trim().to_string();
+            let regex = Regex::new(r"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)").unwrap();
 
-                            std::process::exit(0);
-                        }
-                        let options: Vec<&str> = vec!["Commit", "Edit"];
-
-                        match Select::new(
-                            "Commit or edit the message? (tip: use --yes to skip this prompt)",
-                            options,
-                        )
-                        .prompt()
-                        {
-                            Ok(choice) => {
-                                if choice == "Commit" {
-                                    let output = std::process::Command::new("git")
-                                        .arg("commit")
-                                        .arg("-m")
-                                        .arg(&commit_message)
-                                        .output()
-                                        .expect("failed to execute commit");
-                                    if output.stdout.len() > 0 {
-                                        println!("{}", String::from_utf8_lossy(&output.stdout));
-                                    }
-
-                                    std::process::exit(0);
-                                }
-                                if choice == "Edit" {
-                                    let edited_message =
-                                        Text::new("✏️").with_initial_value(&commit_message).prompt();
-                                    match edited_message {
-                                        Ok(edited_message) => {
-                                            let output = std::process::Command::new("git")
-                                                .arg("commit")
-                                                .arg("-m")
-                                                .arg(&edited_message)
-                                                .output()
-                                                .expect("failed to execute commit");
-                                            if output.stdout.len() > 0 {
-                                                println!(
-                                                    "{}",
-                                                    String::from_utf8_lossy(&output.stdout)
-                                                );
-                                            }
-
-                                            std::process::exit(0);
-                                        }
-                                        // user pressed ctrl-c, just exit the program
-                                        Err(_) => std::process::exit(0),
-                                    }
-                                }
-                            }
-                            Err(_) => std::process::exit(1),
-                        }
-                    }
+            if !regex.is_match(&commit_message) {
+                spinner.update("retry because commit message does not match the conventional commits specification...");
+                let (responder, mut receiver) = mpsc::channel(8);
+                tx.send(Prompt {
+                    prompt: prompt.clone(),
+                    responder,
+                    temperature: 1.2,
+                })
+                .await
+                .expect("failed to send prompt to LLM manager");
+                commit_message = String::new();
+                while let Some(text) = receiver.recv().await {
+                    commit_message.push_str(&text);
+                    spinner.update(commit_message.trim());
                 }
-                // diff.is_none() is checked above so we panic here
-                None => panic!("no diff found, have you staged (`git add`) any files?"),
+            }
+            spinner.success(&format!("generated:'{}'", commit_message));
+            if !*dry_run {
+                if *all_yes {
+                    commit_then_exit(&commit_message, *signoff)
+                }
+                let options: Vec<&str> = vec!["Commit", "Edit"];
+
+                match Select::new(
+                    "Commit or edit the message? (tip: use --yes to skip this prompt)",
+                    options,
+                )
+                .prompt()
+                {
+                    Ok(choice) => {
+                        if choice == "Commit" {
+                            commit_then_exit(&commit_message, *signoff);
+                        }
+                        if choice == "Edit" {
+                            let edited_message =
+                                Text::new("✏️").with_initial_value(&commit_message).prompt();
+                            match edited_message {
+                                Ok(edited_message) => {
+                                    commit_then_exit(&edited_message, *signoff);
+                                }
+                                // user pressed ctrl-c, just exit the program
+                                Err(_) => std::process::exit(0),
+                            }
+                        }
+                    }
+                    Err(_) => std::process::exit(1),
+                }
             }
         }
         Some(CLICommands::Any(args)) => {
