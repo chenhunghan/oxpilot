@@ -1,6 +1,6 @@
 # `oxpilot` - rusty AI copilot
 
-`oxpilot` is a CLI powered by LLM (currently [Mistral-7B-Instruct-v0.2](https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2)) written in Rust 🦀. It's built on top of [candle](https://github.com/huggingface/candle), with aims to be minimalist, fast, and accessable (in terms of computing resource).
+`oxpilot` is a CLI powered by LLM[^1] written in Rust 🦀. It's built on top of [candle](https://github.com/huggingface/candle), with aims to be minimalist, fast, and accessible (in terms of computing resource).
 
 <p align="center">
   <img src="./doc/img/rusty-copilot.jpeg" width="320" height="320" alt="A rusty programming copilot" />
@@ -13,7 +13,6 @@
 Install using `brew`
 
 ```sh
-brew update
 brew install chenhunghan/homebrew-formulae/oxpilot
 ```
 
@@ -63,9 +62,9 @@ ox serve
 
 ## Goal of this project
 
-The primary goal of this project is to teach (myself, and everyone else) idiomatic Rust, similar to [mini-redis](https://github.com/tokio-rs/mini-redis), thefore the code is overly heavily documented, there is an article introducing the core concepts [I made a Copilot in Rust 🦀 , here is what I have learned](https://dev.to/chenhunghan/i-made-a-copilot-in-rust-here-is-what-i-have-learned-as-a-typescript-dev-52md), I recommend to read first, and [PRs description](https://github.com/chenhunghan/oxpilot/pulls?q=is%3Apr) are packed with design patterns used in the code base.
+The primary goal of this project is to teach (myself, and everyone else) idiomatic Rust, similar to [mini-redis](https://github.com/tokio-rs/mini-redis), therefore the code is overly heavily documented, there is an article introducing the core concepts [I made a Copilot in Rust 🦀 , here is what I have learned](https://dev.to/chenhunghan/i-made-a-copilot-in-rust-here-is-what-i-have-learned-as-a-typescript-dev-52md), I recommend to read first, and [PRs description](https://github.com/chenhunghan/oxpilot/pulls?q=is%3Apr) are packed with design patterns used in the code base.
 
-- [Introduction](https://dev.to/chenhunghan/i-made-a-copilot-in-rust-here-is-what-i-have-learned-as-a-typescript-dev-2n2p-temp-slug-6347339?preview=542b15b40bd1c6551c37ba5132030656b8fe8db5467a160112e8389e1ad7c6d901c13fd836c53124a72ab38bb0ae39d7f6de01969655b70ba69851d7)
+- [Introduction](https://dev.to/chenhunghan/i-made-a-copilot-in-rust-here-is-what-i-have-learned-as-a-typescript-dev-52md)
 - Design Patterns
   - [Builder and `impl Into<String>`](https://github.com/chenhunghan/oxpilot/pull/1)
   - [Type State: Friendly API for Better DX](https://github.com/chenhunghan/oxpilot/pull/5)
@@ -79,3 +78,5 @@ git push
 git tag v0.1.0
 git push --tags # will then trigger CI
 ```
+
+[^1]: Currently [Mistral-7B-Instruct-v0.2](https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2)
