@@ -2,6 +2,7 @@
 name = "oxpilot"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/chenhunghan/oxpilot/"
 
 [[bin]]
 # https://github.com/rust-lang/cargo/pull/9627/files#diff-e35cef716988e9f7122a9c90479aa9204e61d1f41b094c0d183a44e0ca271eaa
@@ -37,3 +38,34 @@ inquire = "0.6.2"
 reqwest = { version = "0.11.22", features = ["json", "stream", "multipart"] }
 reqwest-eventsource = "0.5.0"
 eventsource-stream = "0.2.3"
+
+# The profile that 'cargo dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
+# Config for 'cargo dist'
+[workspace.metadata.dist]
+# The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.5.0"
+# CI backends to support
+ci = ["github"]
+# The installers to generate for each app
+installers = ["shell", "npm", "homebrew"]
+# A GitHub repo to push Homebrew formulas to
+tap = "chenhunghan/homebrew-formulae"
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+]
+# The archive format to use for windows builds (defaults .zip)
+windows-archive = ".zip"
+# The archive format to use for non-windows builds (defaults .tar.xz)
+unix-archive = ".tar.gz"
+# Publish jobs to run in CI
+publish-jobs = ["homebrew"]
+# Publish jobs to run in CI
+pr-run-mode = "plan"
