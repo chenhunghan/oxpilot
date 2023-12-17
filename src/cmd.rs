@@ -5,5 +5,6 @@ pub enum Command {
         prompt: String,
         responder: Responder<String>,
         temperature: f64,
+        max_sampled: usize,
     },
 }

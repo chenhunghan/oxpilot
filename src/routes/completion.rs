@@ -33,6 +33,7 @@ pub async fn completion(
             prompt,
             responder,
             temperature: body.temperature.unwrap_or(1.0),
+            max_sampled: body.max_tokens.unwrap_or(4096),
         }).await.unwrap();
 
         // the manager task will send the completion back to us via the `responder`.

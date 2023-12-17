@@ -119,7 +119,6 @@ async fn main() {
         let repeat_last_n = cli.repeat_last_n;
         let repeat_penalty = cli.repeat_penalty;
         let eos_token = "</s>";
-        let max_sampled = 128;
         while let Some(cmd) = rx.recv().await {
             match cmd {
                 // handle Command::Prompt from `tx.send().await`;
@@ -127,6 +126,7 @@ async fn main() {
                     prompt,
                     responder,
                     temperature,
+                    max_sampled,
                 } => {
                     debug!("prompt:{}", prompt);
                     process(
@@ -192,6 +192,7 @@ async fn main() {
                 prompt: prompt.clone(),
                 responder,
                 temperature: 0.8,
+                max_sampled: 256,
             })
             .await
             .expect("failed to send prompt to LLM manager");
@@ -211,6 +212,7 @@ async fn main() {
                     prompt: prompt.clone(),
                     responder,
                     temperature: 1.2,
+                    max_sampled: 256,
                 })
                 .await
                 .expect("failed to send prompt to LLM manager");
@@ -278,6 +280,7 @@ async fn main() {
                         prompt,
                         responder,
                         temperature: 1.0,
+                        max_sampled: 4096,
                     })
                     .await
                     .expect("failed to send prompt to LLM manager");
