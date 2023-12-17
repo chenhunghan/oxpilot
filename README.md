@@ -30,3 +30,12 @@ The primary goal of this project is to teach (myself, and everyone else) idiomat
   - [Builder and `impl Into<String>`](https://github.com/chenhunghan/oxpilot/pull/1)
   - [Type State: Friendly API for Better DX](https://github.com/chenhunghan/oxpilot/pull/5)
   - [BDD `POST /v1/engines/:engine/completions`](https://github.com/chenhunghan/oxpilot/pull/6)
+
+## Release
+
+```
+git commit -am "release: version 0.1.0" --allow-empty
+git push
+git tag v0.1.0
+git push --tags # will then trigger CI
+```
